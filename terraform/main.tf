@@ -4,6 +4,7 @@ resource "aws_vpc" "cloudops" {
   tags = {
     Name = "cloudops-vpc-tf"
   }
+
 }
 
 resource "aws_subnet" "public_a" {
@@ -58,6 +59,7 @@ resource "aws_instance" "web" {
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.web.id]
   key_name               = "cloudops-web-key-2"
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
@@ -131,16 +133,8 @@ resource "aws_route_table_association" "private_a" {
 
 resource "aws_security_group" "web" {
   name        = "cloudops-web-sg-tf"
-  description = "Allow SSH from home and HTTP from the internet"
+  description = "Allow public HTTP only"
   vpc_id      = aws_vpc.cloudops.id
-
-  ingress {
-    description = "SSH from home"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.ssh_allowed_cidr]
-  }
 
   ingress {
     description = "Allow public HTTP"
@@ -161,4 +155,39 @@ resource "aws_security_group" "web" {
   tags = {
     Name = "cloudops-web-sg-tf"
   }
+}
+
+resource "aws_iam_role" "ec2_role" {
+  name = "cloudops-ec2-role-tf"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "cloudops-ec2-profile-tf"
+  role = aws_iam_role.ec2_role.name
 }

@@ -28,33 +28,24 @@ resource "aws_subnet" "private_a" {
   }
 }
 
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
+resource "aws_subnet" "private_b" {
+  vpc_id            = aws_vpc.cloudops.id
+  cidr_block        = var.private_subnet_b_cidr
+  availability_zone = var.availability_zone_b
 
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-x86_64"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name   = "root-device-type"
-    values = ["ebs"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
+  tags = {
+    Name = "private-subnet-b-tf"
   }
 }
 
+resource "aws_route_table_association" "private_b" {
+  subnet_id      = aws_subnet.private_b.id
+  route_table_id = aws_route_table.private.id
+}
+
+
 resource "aws_instance" "web" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = var.ami_id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.web.id]
@@ -157,6 +148,32 @@ resource "aws_security_group" "web" {
   }
 }
 
+resource "aws_security_group" "database" {
+  name        = "cloudops-db-sg-tf"
+  description = "Allow PostgreSQL from the web server only"
+  vpc_id      = aws_vpc.cloudops.id
+
+  ingress {
+    description     = "PostgreSQL from web server"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id]
+  }
+
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "cloudops-db-sg-tf"
+  }
+}
+
 resource "aws_iam_role" "ec2_role" {
   name = "cloudops-ec2-role-tf"
 
@@ -190,4 +207,17 @@ resource "aws_iam_role_policy_attachment" "cloudwatch" {
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "cloudops-ec2-profile-tf"
   role = aws_iam_role.ec2_role.name
+}
+
+resource "aws_db_subnet_group" "cloudops" {
+  name = "cloudops-db-subnet-group"
+
+  subnet_ids = [
+    aws_subnet.private_a.id,
+    aws_subnet.private_b.id
+  ]
+
+  tags = {
+    Name = "cloudops-db-subnet-group"
+  }
 }

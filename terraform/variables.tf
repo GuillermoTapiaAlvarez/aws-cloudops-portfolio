@@ -38,3 +38,21 @@ variable "ssh_allowed_cidr" {
   description = "CIDR allowed to SSH into the web server"
   type        = string
 }
+
+variable "private_subnet_b_cidr" {
+  description = "CIDR block for the second private subnet"
+  type        = string
+  default     = "10.10.12.0/24"
+}
+
+variable "availability_zone_b" {
+  description = "Second Availability Zone for database subnet placement"
+  type        = string
+  default     = "us-east-2b"
+}
+
+variable "ami_id" {
+  description = "Pinned Amazon Linux 2023 AMI ID"
+  type        = string
+  default     = "ami-01cb65bdf4b589c2d"
+}

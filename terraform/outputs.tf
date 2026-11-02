@@ -12,3 +12,8 @@ output "web_url" {
   description = "HTTP URL for the Terraform web server"
   value       = "http://${aws_instance.web.public_ip}"
 }
+
+output "db_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing the RDS master credentials"
+  value       = aws_db_instance.postgres.master_user_secret[0].secret_arn
+}

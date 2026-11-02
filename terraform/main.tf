@@ -221,3 +221,65 @@ resource "aws_db_subnet_group" "cloudops" {
     Name = "cloudops-db-subnet-group"
   }
 }
+
+resource "aws_db_instance" "postgres" {
+  identifier = "cloudops-postgres-tf"
+
+  engine         = "postgres"
+  instance_class = "db.t4g.micro"
+
+  allocated_storage     = 20
+  max_allocated_storage = 25
+  storage_type          = "gp3"
+
+  db_name  = "cloudops"
+  username = "cloudopsadmin"
+
+  manage_master_user_password = true
+
+  db_subnet_group_name   = aws_db_subnet_group.cloudops.name
+  vpc_security_group_ids = [aws_security_group.database.id]
+
+  publicly_accessible = false
+  multi_az            = false
+
+  backup_retention_period = 1
+
+  skip_final_snapshot = true
+  deletion_protection = false
+
+  tags = {
+    Name = "cloudops-postgres-tf"
+  }
+}
+
+output "db_endpoint" {
+  description = "RDS PostgreSQL endpoint"
+  value       = aws_db_instance.postgres.endpoint
+}
+
+output "db_address" {
+  description = "RDS PostgreSQL hostname"
+  value       = aws_db_instance.postgres.address
+}
+
+resource "aws_iam_role_policy" "rds_secret_access" {
+  name = "cloudops-rds-secret-access"
+  role = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+
+        Resource = aws_db_instance.postgres.master_user_secret[0].secret_arn
+      }
+    ]
+  })
+}
